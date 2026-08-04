@@ -1,0 +1,6 @@
+{
+  "name": "Dientes & Sonrisa - WhatsApp Bot RAG Backend Studio",
+  "description": "Backend completo en FastAPI para WhatsApp Business Bot con RAG, Gemini AI, Clean Architecture y despliegue en GCP Cloud Run.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
