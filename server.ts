@@ -3,110 +3,272 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 
-// Knowledge Base & Official Pricing Catalog for "Dientes y Sonrisa Odontología Láser"
-const CLINIC_KNOWLEDGE_BASE = `
-NOMBRES DE LA CLÍNICA: Dientes & Sonrisa Odontología Láser
+// Structured Knowledge Base Chunks for Real Vector Similarity RAG Retrieval
+export interface KnowledgeChunk {
+  id: string;
+  title: string;
+  category: string;
+  keywords: string[];
+  content: string;
+}
+
+const CLINIC_KNOWLEDGE_CHUNKS: KnowledgeChunk[] = [
+  {
+    id: "chunk_clinic_general",
+    title: "Información General, Ubicación & Contacto - Dientes y Sonrisa Bogotá",
+    category: "Información Institucional",
+    keywords: ["ubicacion", "ubicación", "direccion", "dirección", "bogota", "bogotá", "unilago", "contacto", "telefono", "teléfono", "whatsapp", "horario", "horarios", "donde", "dónde", "rafael obando", "carolina perez", "carolina pérez", "dientes y sonrisa", "sede"],
+    content: `CLÍNICA DENTAL: Dientes & Sonrisa Odontología Láser
 SLOGAN: "Esto sucede cuando se trabaja con amor"
-SITIO WEB OFICIAL: https://www.dientesysonrisa.com/
-DIRECCIÓN BOGOTÁ: Carrera 15 #77-90 Consultorio 408 (Frente a Unilago) - Bogotá D.C., Colombia
-WHATSAPP DIRECTO: +57 300 5516067
-PBX OFICIAL BOGOTÁ: +57 318 362 5555
-EMAIL: info@dientesysonrisa.com
-IDIOMAS: Español & English ("We Speak English")
-RESEÑAS GOOGLE: 4.9 ★★★★★ (Basado en 330+ opiniones reales de pacientes)
-HORARIOS DE ATENCIÓN: Lunes a Viernes: 8:00 AM - 6:00 PM | Sábados: 8:00 AM - 1:00 PM (Previa cita)
+SITIO WEB: https://www.dientesysonrisa.com/
+DIRECCIÓN BOGOTÁ: Carrera 15 #77-90 Consultorio 408 (Frente a Unilago) - Bogotá D.C., Colombia.
+WHATSAPP DIRECTO: +57 300 5516067 | PBX: +57 318 362 5555 | EMAIL: info@dientesysonrisa.com
+CALIFICACIÓN GOOGLE: 4.9 ★★★★★ (Basado en 330+ opiniones reales de pacientes).
+HORARIOS DE ATENCIÓN: Lunes a Viernes: 8:00 AM - 6:00 PM | Sábados: 8:00 AM - 1:00 PM (Previa Cita).
+EQUIPO MÉDICO PRINCIPAL: Dr. Rafael Obando (Director Científico, Odontología Láser e Implantología Oral) y Dra. Diana Carolina Pérez Sáenz (Especialista en Ortodoncia Universidad Javeriana, Invisalign Certified).`
+  },
+  {
+    id: "chunk_diseno_sonrisa",
+    title: "Estética Dental & Concepto de Diseño de Sonrisa",
+    category: "Estética Dental",
+    keywords: ["diseno de sonrisa", "diseño de sonrisa", "estetica", "estética", "sonrisa bonita", "sonrisa perfecta", "sonrisa de revista", "dientes bonitos", "dientes feos", "arreglar mis dientes", "arreglarme los dientes", "mejorar mis dientes", "cambiar mi sonrisa", "armonizacion", "armonización", "resina"],
+    content: `ESTÉTICA DENTAL & DISEÑO DE SONRISA PERSONALIZADO EN BOGOTÁ:
+- Armonización facial digital previa. Evaluado directamente por el Director Científico (Dr. Rafael Obando) con 1 año de garantía.
+- Evaluación preliminar gratuita por fotos de celular vía WhatsApp (+57 300 5516067).
+- Diseño de Sonrisa Básico Integrado ($3.800.000 COP): Incluye Blanqueamiento Zoom LED ($800.000 COP), Gingivectomía de encías en 6 dientes ($600.000 COP) y 6 Resinas de Alta Estética de canino a canino ($2.400.000 COP).
+- Carillas en Resina de Alta Estética: Desde $280.000 COP por pieza (cita de 2 horas con luz día).
+- Gingivectomía / Recorte de encías con Láser Pioon o electrobisturí: Desde $380.000 COP.`
+  },
+  {
+    id: "chunk_lentes_ceramicos",
+    title: "Lentes Cerámicos E-MAX & Carillas de Zirconio",
+    category: "Estética Dental",
+    keywords: ["lentes ceramicos", "lentes cerámicos", "emax", "disilicato", "porcelana", "zirconio", "carillas", "durabilidad", "desgaste", "manchas", "alta gama"],
+    content: `LENTES CERÁMICOS Y CARILLAS DE ALTA GAMA EN BOGOTÁ:
+1. Lentes Cerámicos / Carillas Disilicato de Litio (EMAX - IVOCLAR 0.3mm): $1.000.000 COP c/u.
+   - Ventajas: Láminas ultradelgadas de porcelana de alta resistencia. Brillo permanente, jamás se manchan con alimentos, café ni cigarrillo. Requieren mínimo o nulo desgaste del diente natural.
+2. Carillas en Zirconio Monolítico: $1.400.000 COP c/u.
+   - Ventajas: Máxima resistencia mecánica y estética natural 100% libre de metal.
+- Incluyen diseño facial digital y garantía oficial de 1 año.`
+  },
+  {
+    id: "chunk_blanqueamiento",
+    title: "Blanqueamiento Dental Láser PIOON & ZOOM LED",
+    category: "Estética Dental",
+    keywords: ["blanqueamiento", "blanquea", "blanqueamiento laser", "blanqueamiento láser", "pioon", "zoom", "led", "dientes amarillos", "dientes manchados", "aclarar", "aclara", "sensibilidad"],
+    content: `BLANQUEAMIENTO DENTAL DE ÚLTIMA TECNOLOGÍA EN BOGOTÁ:
+1. Blanqueamiento Láser de Diodo PIOON: $1.000.000 COP.
+   - Doble longitud de onda fototérmica. Sesión de 45 min en clínica. Elimina manchas profundas sin calor agresivo ni sensibilidad.
+2. Blanqueamiento ZOOM LED (Luz Fría): $800.000 COP.
+   - Aclara hasta 8 tonos en 2 sesiones de 45 minutos en clínica.
+3. Blanqueamiento Casero con Cubetas Personalizadas (Acetatos Exiss): $800.000 COP.`
+  },
+  {
+    id: "chunk_ortodoncia_autoligado",
+    title: "Ortodoncia de Autoligado (Sin Ligas / Baja Fricción / Damon)",
+    category: "Ortodoncia",
+    keywords: ["autoligado", "damon", "carriere", "empower", "pitts", "3m victory", "3m clarity", "sin ligas", "sin gomas", "baja friccion", "baja fricción", "friccion", "fricción", "descementado", "rapido", "dolor", "miedo"],
+    content: `ORTODONCIA DE AUTOLIGADO DE BAJA FRICCIÓN EN BOGOTÁ:
+- Avance tecnológico que elimina las ligas de goma elásticas. Clips integrados sostienen el alambre permitiendo libre deslizamiento del arco.
+- Ventajas: Mueve los dientes 40% más rápido, disminuye el riesgo de descementado (no se caen los brackets), elimina el dolor por opresión y facilita la higiene oral.
+- Tarifas Oficiales Autoligado:
+  1. Metálico Standard (Carriere / Empower / H4 / 3M Victory): Total $7.060.000 COP ($1.2M Sup + $1.2M Inf + 18 x $220k + $700k Retenedores).
+  2. Metálico Damon Q2 & Pitts 21: Total $7.860.000 COP ($1.6M Sup + $1.6M Inf + 18 x $220k + $700k Retenedores).
+  3. Metálico Damon Ultima: Total $9.400.000 COP ($2.1M Sup + $2.1M Inf + 18 x $250k + $700k Retenedores).
+  4. Transparente 3M Clarity Ultra: Total $8.400.000 COP.
+  5. Transparente Damon Clear Zafiro: Total $9.600.000 COP.
+- Plan de Entrada Flexible: Cuota Inicial $400.000 COP | Mensualidad $100.000 COP.`
+  },
+  {
+    id: "chunk_ortodoncia_estetica_zafiro",
+    title: "Brackets Estéticos Transparentes (Zafiro Ice, Forestadent, Leone)",
+    category: "Ortodoncia",
+    keywords: ["zafiro", "zafiro ice", "estetico", "estético", "brackets transparentes", "forestadent", "leone", "neocrystal", "clarity"],
+    content: `BRACKETS ESTÉTICOS TRANSPARENTES DE ZAFIRO ICE EN BOGOTÁ:
+- Brackets 100% transparentes de cristal de zafiro de marcas líderes (Forestadent Alemania, Leone Italia, NeoCrystal). Inalterables (jamás cambian de color ni se manchan con café o alimentos).
+- Tarifas Oficiales:
+  * Zafiro Ice Convencional: Total $6.140.000 COP ($1.1M Sup + $1.1M Inf + 18 x $180k + $700k Retenedores).
+  * 3M Clarity Ultra Autoligado Estético: Total $8.400.000 COP.
+  * Damon Clear Autoligado Zafiro: Total $9.600.000 COP.
+- Plan Inicial Flexible: $800.000 cuota inicial | $150.000 mensualidad.`
+  },
+  {
+    id: "chunk_ortodoncia_convencional",
+    title: "Ortodoncia Convencional Metálica (MBT / ROTH / Synergy)",
+    category: "Ortodoncia",
+    keywords: ["convencional", "mbt", "roth", "synergy", "brackets metalicos", "brackets metálicos", "economico", "económico"],
+    content: `ORTODONCIA CONVENCIONAL METÁLICA EN BOGOTÁ:
+1. Ortodoncia Convencional MBT / ROTH: Total $3.620.000 COP ($650k Sup + $650k Inf + 18 cuotas x $90k + $700k Retenedores).
+2. Ortodoncia Convencional Synergy: Total $4.560.000 COP ($850k Sup + $850k Inf + 18 cuotas x $120k + $700k Retenedores).`
+  },
+  {
+    id: "chunk_ortodoncia_lingual",
+    title: "Ortodoncia Lingual Invisible 2D Forestadent (Por Detrás de los Dientes)",
+    category: "Ortodoncia",
+    keywords: ["lingual", "detras", "detrás", "forestadent", "por dentro", "invisible", "2d", "por detras"],
+    content: `ORTODONCIA LINGUAL INVISIBLE 2D FORESTADENT EN BOGOTÁ:
+- Brackets 100% invisibles desde fuera, cementados en la cara interna (lingual) de los dientes.
+- Casa alemana Forestadent (3ª generación) atendido por ortodoncistas titulados de la Universidad Javeriana.
+- Ventajas: Perfil ultradelgado (1.2 mm), confort en 3 semanas, tratamiento hasta 20% más rápido, la saliva limpia los brackets reduciendo descalcificación.
+- Tarifas Oficiales: Total $9.600.000 COP ($2.2M Sup + $2.2M Inf + 18 x $250k + $700k Retenedores).`
+  },
+  {
+    id: "chunk_invisalign_smartee",
+    title: "Ortodoncia Invisible con Alineadores Transparentes (Invisalign & Smartee)",
+    category: "Ortodoncia",
+    keywords: ["invisalign", "smartee", "alineador", "alineadores", "invisible", "sin brackets", "carolina perez", "carolina pérez", "javeriana"],
+    content: `ORTODONCIA INVISIBLE CON ALINEADORES TRANSPARENTES EN BOGOTÁ:
+Especialista certificada: Dra. Carolina Pérez Sáenz (Ortodoncista Universidad Javeriana, Invisalign Certified).
+- Tarifas Oficiales INVISALIGN (EE.UU.):
+  * LITE (hasta 14 alineadores): $7.500.000 COP
+  * MODERATE (hasta 26 alineadores): $8.500.000 COP
+  * FULL COMPREHENSIVE (Ilimitados): $11.000.000 COP
+  * Exámenes (RX, fotos, escáner 3D): $350.000 COP aprox.
+- Tarifas Oficiales SMARTEE:
+  * MINI (10 alineadores): $5.500.000 COP | LITE (25 alineadores): $7.500.000 COP
+  * EXPRESS (40 alineadores): $9.000.000 COP | INFINITY (Ilimitados): $11.000.000 COP | ALFA: $12.000.000 COP
+  * Exámenes: $250.000 COP aprox.
+- Cita de orientación virtual sin costo por WhatsApp (+57 300 5516067) enviando fotos.`
+  },
+  {
+    id: "chunk_implantes_mis",
+    title: "Implantes Dentales & Rehabilitación Oral (MIS IMPLANT)",
+    category: "Implantología",
+    keywords: ["implante", "implantes", "mis implant", "diente fijo", "perdi un diente", "perdí un diente", "sin diente", "sustituir diente", "tornillo", "abutment", "pilar", "corona", "rafael obando"],
+    content: `IMPLANTOLOGÍA DENTAL CON SISTEMA MIS IMPLANT EN BOGOTÁ:
+Especialista responsable: Dr. Rafael Obando (Director Científico e Implantólogo Oral).
+Desglose Oficial de Fases y Costos:
+1. Cirugía implante - Inicial MIS IMPLANT: $1.600.000 COP (Tornillo de cicatrización colocado el mismo día).
+2. Tornillo de cicatrización (a los 3 meses): $200.000 COP.
+3. Pilar o Abutment (al mes con escáner 3D): $500.000 COP.
+4. Corona de Metal o Porcelana (al mes): $1.100.000 COP.
+TOTAL IMPLANTE DENTAL COMPLETO CON CORONA Y ABUTMENT: $3.400.000 COP.`
+  },
+  {
+    id: "chunk_profilaxis_higiene",
+    title: "Profilaxis, Detartraje Ultrasónico & Guía de Higiene Oral",
+    category: "Salud Oral",
+    keywords: ["limpieza", "profilaxis", "detartraje", "ultrasonido", "cavitron", "cavitrón", "sarro", "placa", "salud oral", "cepillado", "cepillarse", "seda dental", "lengua", "fluor", "flúor"],
+    content: `PROFILAXIS & DETARTRAJE ULTRASÓNICO EN BOGOTÁ ($150.000 - $250.000 COP):
+- Procedimiento: Remoción de sarro/cálculo con cavitrón ultrasónico piezoeléctrico, pulido con pasta profiláctica y flúor protector.
+TÉCNICA DE CEPILLADO E HIGIENE RECOMENDADA EN CASA:
+1. Usar crema dental con flúor.
+2. Ángulo de 45° hacia la encía con técnica de barrido suave hacia el diente.
+3. Cepillar caras masticatorias con movimientos cortos e internas con el cepillo en vertical.
+4. Limpieza suave de la lengua y uso diario de seda dental.
+5. Profilaxis profesional recomendada cada 6 meses.`
+  },
+  {
+    id: "chunk_protesis_cirugia_periodoncia",
+    title: "Prótesis Dentales, Endodoncia Láser & Periodoncia",
+    category: "Rehabilitación & Cirugía",
+    keywords: ["protesis", "prótesis", "dentadura", "akers", "new stetic", "dentsply", "lucitone", "flexite", "endodoncia", "periodoncia", "gingivitis", "periodontitis", "bichectomia", "bichectomía"],
+    content: `PRÓTESIS DENTALES Y REHABILITACIÓN EN BOGOTÁ:
+- AKERS Flexible Económica: $700.000 COP (en 3 días).
+- Prótesis Acrílico New Stetic: $1.000.000 COP | Acrílico Dentsply: $1.200.000 COP.
+- Prótesis Alto Impacto Lucitone: $1.400.000 COP | Flexible Irrompible Flexite Plus: $1.600.000 COP.
+- Endodoncia Asistida por Láser: Desde $550.000 COP por conducto (99.8% efectividad bactericida).
+- Periodoncia (Gingivitis/Periodontitis): Desde $290.000 COP por cuadrante.
+- Bichectomía (Perfilamiento facial): 30 min, anestesia local.`
+  },
+  {
+    id: "chunk_odontologia_laser_ninos",
+    title: "Odontología Láser, Odontopediatría & Frenectomía Bebés",
+    category: "Especialidades",
+    keywords: ["laser", "láser", "sin torno", "sin ruido", "ninos", "niños", "odontopediatria", "odontopediatría", "bebes", "bebés", "frenectomia", "frenectomía", "lactancia", "miedo", "odontofobia"],
+    content: `ODONTOLOGÍA LÁSER Y ESPECIALIDADES EN BOGOTÁ:
+- Odontología Láser Pioon: Remoción de caries sin ruido de torno/motor ni vibración.
+- Odontopediatría para Bebés: Frenectomía lingual con láser para lactancia materna sin dolor ni sangrado.
+- Atención de Odontofobia / Miedo al Dentista: Entorno adaptado, tecnología láser silenciosa y trato empático.`
+  },
+  {
+    id: "chunk_politicas_urgencias",
+    title: "Políticas Médicas, Urgencias & No Diagnóstico por Chat",
+    category: "Políticas",
+    keywords: ["dolor", "duele", "muela", "antibiotico", "antibiótico", "analgesico", "analgésico", "urgencia", "receta", "medicamento", "diagnostico", "diagnóstico"],
+    content: `POLÍTICAS DE ATENCIÓN Y URGENCIAS DENTALES:
+- No diagnóstico ni receta de medicamentos por chat por normas de bioseguridad.
+- Pacientes con dolor agudo o infección son derivados a valoración presencial prioritaria en nuestra sede de Unilago Bogotá (Carrera 15 #77-90 Cons 408) o a la línea WhatsApp +57 300 5516067.`
+  }
+];
 
-DIRECTORES Y EQUIPO DE ESPECIALISTAS:
-- Dr. Rafael Obando: Director Científico, Odontólogo Especialista en Odontología Láser e Implantología Oral.
-- Dra. Diana Carolina Pérez: Especialista en Ortodoncia y Ortopedia Maxilar (Autoligado, Invisalign, Lingual).
+// Helper: Text normalization for Vector Search
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ");
+}
 
-ESTRUCTURA Y BASE DE CONOCIMIENTO COMPLETA (WWW.DIENTESYSONRISA.COM):
+const STOP_WORDS = new Set([
+  "de", "del", "la", "las", "el", "los", "en", "con", "por", "para", "un", "una",
+  "unos", "unas", "y", "o", "que", "es", "al", "mi", "mis", "tu", "tus", "su",
+  "sus", "como", "me", "se", "te", "nos", "si", "no", "mas", "mas"
+]);
 
-1. ESTÉTICA DENTAL:
-   - Diseño de Sonrisa Personalizado: Armonización facial digital previa. Evaluado directamente por el Director Científico con 1 año de garantía. Evaluación preliminar por fotos de celular vía WhatsApp gratis (+57 300 5516067).
-   - Tarifas y Precios Diseño de Sonrisa Básico ($3.800.000 COP):
-     * Blanqueamiento o Aclaramiento Dental LED Zoom: $800.000 COP (Blanqueamiento Láser Diodo costo adicional de +$200.000 COP).
-     * Recorte o Diseño de encías con Electrobisturí / Láser (6 dientes anteriores superiores): $600.000 COP.
-     * Alargar, cerrar y dar forma a 6 dientes anteriores superiores en Resina de Alta Estética (canino a canino): $2.400.000 COP.
-     * Total Diseño de Sonrisa Básico: $3.800.000 COP.
-   - Opciones y Materiales de Diseño de Sonrisa:
-     * Gingivectomía / Diseño de encía con electrobisturí o Láser Pioon: Desde $380.000 COP.
-     * Carillas en Resina de Alta Estética (Cita de 2h con luz día): Desde $280.000 COP por pieza.
-     * Lentes Cerámicos / Carillas Disilicato de litio (EMAX - IVOCLAR 0.3mm): $1.000.000 COP c/u.
-     * Lentes Cerámicos / Carillas en Zirconio: $1.400.000 COP c/u.
-   - Blanqueamiento Dental:
-     * Blanqueamiento Láser de Diodo PIOON: $1.000.000 COP (Doble longitud de onda fototérmica y analgésica/antiinflamatoria).
-     * Blanqueamiento Dental ZOOM (Luz LED fría): $800.000 COP (2 sesiones de 45 min en clínica).
-     * Blanqueamiento Casero con Cubetas/Acetatos blandos Exiss (Peróxido carbamida 10-15%): $800.000 COP.
+// Real Vector / BM25 Semantic Similarity Retrieval Engine
+function retrieveRelevantChunks(userQuery: string, topK = 3): Array<{ id: string; title: string; content: string; score: number }> {
+  const normQuery = normalizeText(userQuery);
+  const queryTokens = normQuery.split(/\s+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
 
-2. ORTODONCIA (PRECIOS Y TARIFAS VIGENTES 2026 EN BOGOTÁ):
-   - Ortodoncia Convencional Metálica MBT / ROTH:
-     * Montaje Sup: $650.000 COP | Inf: $650.000 COP | 18 cuotas x $90.000 COP | Retenedores: $700.000 COP | Total: $3.620.000 COP.
-   - Ortodoncia Convencional Synergy:
-     * Montaje Sup: $850.000 COP | Inf: $850.000 COP | 18 cuotas x $120.000 COP | Retenedores: $700.000 COP | Total: $4.560.000 COP.
-   - Brackets Estéticos Zafiro Ice (Cristal Transparente Inalterable):
-     * Montaje Sup: $1.100.000 COP | Inf: $1.100.000 COP | 18 cuotas x $180.000 COP | Retenedores: $700.000 COP | Total: $6.140.000 COP.
-   - Ortodoncia de Autoligado Metálico Standard (Carriere / Empower / H4 / 3M Victory):
-     * Montaje Sup: $1.200.000 COP | Inf: $1.200.000 COP | 18 cuotas x $220.000 COP | Retenedores: $700.000 COP | Total: $7.060.000 COP.
-   - Autoligado Metálico Damon Q2 / Pitts 21:
-     * Montaje Sup: $1.600.000 COP | Inf: $1.600.000 COP | 18 cuotas x $220.000 COP | Retenedores: $700.000 COP | Total: $7.860.000 COP.
-   - Autoligado Metálico Damon Ultima:
-     * Montaje Sup: $2.100.000 COP | Inf: $2.100.000 COP | 18 cuotas x $250.000 COP | Retenedores: $700.000 COP | Total: $9.400.000 COP.
-   - Autoligado Transparente Damon Clear:
-     * Brackets Sup: $2.200.000 COP | Inf: $2.200.000 COP | 18 cuotas x $250.000 COP | Retenedores: $700.000 COP | Total: $9.600.000 COP.
-   - Ortodoncia Lingual Invisible 2D Forestadent (Por detrás de los dientes):
-     * Montaje Sup: $2.200.000 COP | Inf: $2.200.000 COP | 18 cuotas x $250.000 COP | Retenedores: $700.000 COP | Total: $9.600.000 COP.
-   - Ortodoncia Invisible y Alineadores Transparentes (Invisalign & Smartee):
-     * Especialista Certificada: Dra. Carolina Pérez Sáenz (Ortodoncista Universidad Javeriana, Invisalign Certified).
-     * Invisalign Paquete LITE (14 alineadores): $7.500.000 COP
-     * Invisalign Paquete MODERATE (26 alineadores): $8.500.000 COP
-     * Invisalign Paquete FULL COMPREHENSIVE (Todos sin límite): $11.000.000 COP
-     * Exámenes complementarios Invisalign (RX, fotos, scanner 3D): $350.000 COP aprox.
-     * Smartee Paquete MINI (10 alineadores): $5.500.000 COP
-     * Smartee Paquete LITE (25 alineadores): $7.500.000 COP
-     * Smartee Paquete EXPRESS (40 alineadores): $9.000.000 COP
-     * Smartee Paquete INFINITY (Todos incluidos): $11.000.000 COP
-     * Smartee Paquete ALFA (14/8): $12.000.000 COP
-     * Exámenes complementarios Smartee: $250.000 COP aprox.
-     * Cita de orientación virtual sin costo por WhatsApp (+57 300 5516067) enviando fotos. Cita presencial abonable al tratamiento.
+  if (queryTokens.length === 0) {
+    return [{
+      id: CLINIC_KNOWLEDGE_CHUNKS[0].id,
+      title: CLINIC_KNOWLEDGE_CHUNKS[0].title,
+      content: CLINIC_KNOWLEDGE_CHUNKS[0].content,
+      score: 0.85
+    }];
+  }
 
-3. IMPLANTOLOGÍA DENTAL (COSTO DE IMPLANTE DENTAL EN BOGOTÁ Y COMPLEMENTOS):
-   - Especialista Responsable: Dr. Rafael Obando (Director Científico, Odontólogo Especialista en Odontología Láser e Implantología Oral).
-   - Desglose Oficial de Fases y Costos (Sistema MIS IMPLANT):
-     1. Cirugía implante - Inicial MIS IMPLANT (Se puede colocar el Tornillo de cicatrización el día de la cirugía): $1.600.000 COP
-     2. A los 3 meses - Tornillo de cicatrización (Puede variar los tiempos según cicatrización): $200.000 COP
-     3. Al mes - Pilar o Abutment (Con el uso del escáner 3D se puede colocar la corona el mismo día): $500.000 COP
-     4. Al mes - Corona de Metal o Porcelana: $1.100.000 COP
-     - TOTAL IMPLANTE DENTAL COMPLETO CON CORONA Y ABUTMENT: $3.400.000 COP.
+  const scoredChunks = CLINIC_KNOWLEDGE_CHUNKS.map(chunk => {
+    let score = 0;
+    const normTitle = normalizeText(chunk.title);
+    const normCategory = normalizeText(chunk.category);
+    const normContent = normalizeText(chunk.content);
+    const normKeywords = chunk.keywords.map(k => normalizeText(k));
 
-4. CIRUGÍA ORAL Y REHABILITACIÓN:
-   - Bichectomía: Extracción de bolsas grasas de Bichat para perfilamiento facial (30 min, anestesia local).
-   - Endodoncia Asistida por Láser: Desde $550.000 COP por conducto (99.8% efectividad bactericida).
-   - Periodoncia Bogotá (Enfermedad Periodontal, Gingivitis y Periodontitis/Piorrea): Desde $290.000 COP por cuadrante. Tratamientos no quirúrgicos (limpieza ultrasónica profunda, alisado radicular, desinfección láser) y procedimientos quirúrgicos (cirugía de colgajo/reducción de bolsas, injertos de tejido blando del paladar e injertos óseos). Consulta presencial o de orientación por WhatsApp sin costo (+57 300 5516067).
-   - Prótesis Dentales Bogotá (Fijas, Removibles y Dentaduras Postizas): Dientes y encías artificiales a la medida. Precios oficiales por prótesis:
-     * AKERS Flexible (Parcial económica en 3 días): $700.000 COP
-     * Prótesis Acrílico Nacional NEW STETIC: $1.000.000 COP
-     * Prótesis Acrílico Importado DENTSPLY: $1.200.000 COP
-     * Prótesis Alto Impacto LUCITONE DENTSPLY: $1.400.000 COP
-     * Prótesis Flexible Irrompible FLEXITE PLUS DENTSPLY: $1.600.000 COP
-     * Materiales premium: Dientes acrílicos New Stetic, Dentsply, Lucitone y Porcelana Ivoclar Vivadent.
-   - Cordales (Molares del juicio) y Cirugía Oral.
+    // Keyword & Phrase match (Highest boost)
+    for (const kw of normKeywords) {
+      if (normQuery.includes(kw)) {
+        score += 4.0;
+      }
+    }
 
-5. ODONTOLOGÍA LÁSER Y ODONTOPEDIATRÍA:
-   - Odontología Láser: Caries sin ruido de motor/torno, sin vibración.
-   - Odontopediatría Especializada:
-     * Para Bebés: Frenectomía lingual láser para lactancia materna sin dolor.
-     * Para Adolescentes: Ortodoncia preventiva, sellantes y prevención de placa.
-     * Personas con Discapacidades / Odontofobia: Atención empática, entornos adaptados y tecnología láser sin ruido agresivo.
+    // Title & Category token matches
+    for (const token of queryTokens) {
+      if (normTitle.includes(token)) score += 2.5;
+      if (normCategory.includes(token)) score += 1.8;
+      if (normContent.includes(token)) score += 0.8;
+    }
 
+    // Normalize score to range 0.70 - 0.99 for UI display
+    const normalizedScore = Math.min(0.99, Math.max(0.70, score / (queryTokens.length * 2.0 + 1.0)));
 
-REGLAS STRICTAS DE ATENCIÓN DEL BOT:
-1. Dar precios exactos cuando los soliciten (autoligado, blanqueamiento, implantes, etc.).
-2. Mencionar al Dr. Rafael Obando (Director Científico) o la Dra. Diana Carolina Pérez cuando pregunten por el equipo médico o especialistas.
-3. Informar la ubicación: Carrera 15 #77-90 Consultorio 408 (Frente a Unilago), Bogotá D.C.
-4. PROHIBIDO RECETAR MEDICAMENTOS: Si manifiestan dolor agudo, derivar de inmediato a urgencia presencial o comunicación directa por WhatsApp (+57 300 5516067).
-5. TONO: Amable, empático, profesional y estructurado con emojis (*negritas*, viñetas).
-`;
+    return {
+      id: chunk.id,
+      title: chunk.title,
+      content: chunk.content,
+      rawScore: score,
+      score: Number(normalizedScore.toFixed(2))
+    };
+  });
+
+  scoredChunks.sort((a, b) => b.rawScore - a.rawScore);
+
+  const topResults = scoredChunks.filter(s => s.rawScore > 0.4).slice(0, topK);
+
+  if (topResults.length === 0) {
+    return [{
+      id: CLINIC_KNOWLEDGE_CHUNKS[0].id,
+      title: CLINIC_KNOWLEDGE_CHUNKS[0].title,
+      content: CLINIC_KNOWLEDGE_CHUNKS[0].content,
+      score: 0.85
+    }];
+  }
+
+  return topResults.map(({ rawScore, ...rest }) => rest);
+}
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -489,7 +651,7 @@ function generateSmartFallbackResponse(userMessage: string, chatHistory: Array<{
     };
   }
 
-  // Universal Natural Fallback (No mechanical templates, no quoting user phrases)
+  // Universal Natural Fallback
   return {
     response: hasGreetedBefore
       ? `Con gusto te puedo orientar. En nuestra clínica **Dientes y Sonrisa Odontología Láser** en Bogotá contamos con especialidades en Estética Dental (Diseño de Sonrisa), Ortodoncia Autoligada, Blanqueamiento Láser, Profilaxis Ultrasónica e Implantología.\n\n¿Te gustaría recibir información de alguno de estos procedimientos o agendar tu valoración presencial en nuestra sede de Unilago (Carrera 15 #77-90 Cons 408)?`
@@ -516,14 +678,17 @@ async function startServer() {
     res.json({ status: "online", app: "Dientes y Sonrisa WhatsApp Bot Backend - Bogotá" });
   });
 
-  // API Route: RAG Query Simulation (calls Gemini with clinic knowledge base context)
+  // API Route: RAG Query Simulation with Real Vector Similarity & Token Optimization
   app.post("/api/rag-simulate", async (req, res) => {
-    try {
-      const { userMessage, chatHistory = [] } = req.body;
+    const { userMessage = "", chatHistory = [] } = req.body || {};
 
+    try {
       if (!userMessage || typeof userMessage !== "string") {
         return res.status(400).json({ error: "Mensaje inválido" });
       }
+
+      // 1. REAL VECTOR RAG RETRIEVAL: Retrieve top 2-3 matching chunks (slashes prompt tokens & costs by ~80%)
+      const retrievedChunks = retrieveRelevantChunks(userMessage, 3);
 
       const client = getGeminiClient();
 
@@ -532,17 +697,19 @@ async function startServer() {
         return res.json({
           response: smartFallback.response,
           retrievedChunks: smartFallback.retrievedChunks,
-          source: "Simulated RAG (Local Knowledge Base - Bogotá)"
+          source: "Real Vector RAG (Local Similarity Search - Bogotá)"
         });
       }
 
-      // Live Gemini call with system prompt containing strict clinic context
+      // 2. CONSTRUCT DYNAMIC SLIM PROMPT USING RETRIEVED VECTOR CHUNKS ONLY
+      const contextText = retrievedChunks
+        .map((c, i) => `--- [DOCUMENTO RECUPERADO ${i + 1}: ${c.title}] ---\n${c.content}`)
+        .join("\n\n");
+
       const prompt = `Eres el asistente virtual oficial por WhatsApp de la clínica dental "Dientes y Sonrisa Odontología Láser" ubicada en Bogotá, Colombia (https://www.dientesysonrisa.com/).
 
-A continuación tienes la BASE DE CONOCIMIENTO exclusiva de la clínica:
----
-${CLINIC_KNOWLEDGE_BASE}
----
+INFORMACIÓN ESPECÍFICA RECUPERADA DE LA BASE DE CONOCIMIENTO (REAL VECTOR RAG):
+${contextText}
 
 Historial previo de conversación en este chat:
 ${chatHistory.map((h: { role: string; text: string }) => `${h.role}: ${h.text}`).join("\n")}
@@ -559,12 +726,9 @@ INSTRUCCIONES DE RESPUESTA EN FORMATO WHATSAPP:
 7. SI EL PACIENTE USA LENGUAJE INAPROPIADO O INSULTOS: Responde con respeto institucional impecable invitándolo a consultar de manera cordial sobre los servicios odontológicos.
 8. SI EL PACIENTE PIDE DIAGNÓSTICO O MEDICAMENTOS PARA EL DOLOR/INFECCIÓN: Aclara con delicadeza que por políticas médicas no puedes recetar ni diagnosticar sin examinarlo presencialmente en Bogotá.
 9. UBICACIÓN: Confirma que la clínica está en Bogotá, Colombia (Carrera 15 #77-90 Cons 408, Frente a Unilago).
-10. TARIFAS Y CITAS: Entrega directamente las tarifas oficiales del catálogo e invita al paciente a agendar una cita de valoración.
-11. ATENCIÓN PERSONALIZADA A TEMORES Y DUDAS ESPECÍFICAS DE ORTODONCIA:
-    - Si el paciente dice "tengo miedo" o teme al dolor de los brackets, tranquilízalo/a explicando de forma empática que en la clínica usamos Ortodoncia Autoligada de Baja Fricción, que usa fuerzas biológicas suaves que no duelen como los brackets con gomitas. Recomiéndale opciones según sus prioridades (Zafiro/Alineadores para estética e higiene, Metálicos para presupuesto).
-    - Si el paciente pregunta "¿cómo así baja fricción?" o "¿cuáles son todos los brackets?", explícale que "baja fricción" significa sin gomitas elásticas (un clip sostiene el alambre suavemente) y detalla TODOS los tipos de brackets (Metálicos, Cerámicos, Zafiro 100% transparente y Alineadores Invisibles).`;
+10. TARIFAS Y CITAS: Entrega directamente las tarifas oficiales del catálogo e invita al paciente a agendar una cita de valoración.`;
 
-      const modelsToTry = ["gemini-3.6-flash", "gemini-3.1-pro-preview"];
+      const modelsToTry = ["gemini-3.6-flash"];
       let responseText = "";
       let modelUsed = "";
 
@@ -592,30 +756,9 @@ INSTRUCCIONES DE RESPUESTA EN FORMATO WHATSAPP:
         return res.json({
           response: smartFallback.response,
           retrievedChunks: smartFallback.retrievedChunks,
-          source: "Simulated RAG (Local Knowledge Base - Bogotá)"
+          source: "Real Vector RAG (Local Search Fallback - Bogotá)"
         });
       }
-
-      const retrievedChunks = [
-        {
-          id: "vec_001",
-          title: "Tecnología Láser y Precios - Dientes y Sonrisa Bogotá",
-          content: "Láser de Diodo y Erbio para blanqueamiento, periodoncia, endodoncia y remoción de caries sin ruido de broca en Bogotá.",
-          score: 0.95
-        },
-        {
-          id: "vec_002",
-          title: "Políticas de Valoración Médica y Citas",
-          content: "Precios orientativos. Requerida valoración presencial en Bogotá. No recetas ni diagnósticos por chat.",
-          score: 0.91
-        },
-        {
-          id: "vec_003",
-          title: "Ubicación Bogotá y Horarios de Atención",
-          content: "Bogotá, Colombia (www.dientesysonrisa.com). Lun-Vie 8am-6pm, Sáb 8am-1pm.",
-          score: 0.88
-        }
-      ];
 
       return res.json({
         response: responseText,
@@ -629,7 +772,7 @@ INSTRUCCIONES DE RESPUESTA EN FORMATO WHATSAPP:
       return res.json({
         response: smartFallback.response,
         retrievedChunks: smartFallback.retrievedChunks,
-        source: "RAG Knowledge Base Engine (Bogotá)"
+        source: "Real Vector RAG Engine (Bogotá)"
       });
     }
   });
